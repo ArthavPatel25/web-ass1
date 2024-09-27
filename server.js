@@ -6,99 +6,106 @@
 * https://www.senecapolytechnic.ca/about/policies/academic-integrity-policy.html
 *
 * Assignment: 2247 / 1
-* Student Name: [Your Name]
-* Student Email: [Your Email]
+* Student Name: Arthav Patel
+* Student Email: acpatel23@myseneca.ca
 * Course/Section: WEB422/ZAA
-* Deployment URL: https://www.your.assignment.com
+* Vercel URL: 
 *
 *****************************************************************************/
 
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const ListingsDB = require('./modules/listingsDB');
-
-dotenv.config();
-
-const app = express();
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const ListingsDB = require('./modules/listingsDB.js');
 const db = new ListingsDB();
-const PORT = process.env.PORT || 8080; // Default port 8080 if not specified in .env
+require('dotenv').config();
+const app = express();
 
-// Middleware
 app.use(cors());
+app.use(bodyParser.json());
 app.use(express.json());
 
-// Initialize database connection
-db.initialize(process.env.MONGODB_CONN_STRING)
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server listening on port ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Error initializing database:', err);
-  });
+const port = process.env.PORT || 8080;
 
-// Root route to check server status
+// Get method to confirm the server is running
 app.get('/', (req, res) => {
-  res.json({ message: "API Listening" });
+    res.json({ message: "API Listening" });
 });
 
-// API Routes
+// create new listings
 app.post('/api/listings', async (req, res) => {
-  try {
-    const newListing = await db.addNewListing(req.body);
-    res.status(201).json(newListing);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create listing' });
-  }
+    try {
+        let newListing = await db.addNewListing(req.body);
+        res.status(201).json(newListing); // give new listing
+    } catch (err) {
+        res.status(500).json({ error: 'failed'});
+    }
 });
 
+// get all listing based on query
 app.get('/api/listings', async (req, res) => {
-  try {
-    const { page, perPage, name } = req.query;
-    const listings = await db.getAllListings(page, perPage, name);
-    res.json(listings);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to retrieve listings' });
-  }
+    let { page, perPage, name } = req.query;
+    try {
+        const listings = await db.getAllListings(page, perPage, name);
+        res.status(200).json(listings);
+    } catch (err) {
+        res.status(500).json({ error: 'ffailed listings loading'});
+    }
 });
 
+// return specific list accr.. to ID
 app.get('/api/listings/:id', async (req, res) => {
-  try {
-    const listing = await db.getListingById(req.params.id);
-    if (!listing) {
-      res.status(404).json({ error: 'Listing not found' });
-    } else {
-      res.json(listing);
+    let { _id } = req.params; // take id
+    try {
+        const listing = await db.getListingById(_id);
+        if (listing) {
+            res.status(200).json(listing);
+        } else {
+            res.status(404).json({ error: 'listing not found!!!' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'failed to retrieve listing'});
     }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to retrieve listing' });
-  }
 });
 
+// check for change
 app.put('/api/listings/:id', async (req, res) => {
-  try {
-    const updatedListing = await db.updateListingById(req.body, req.params.id);
-    if (updatedListing.nModified === 0) {
-      res.status(404).json({ error: 'Listing not found' });
-    } else {
-      res.status(200).json({ message: 'Listing updated successfully' });
+    let { id } = req.params;
+    let new_Data = req.body;
+    try {
+        let solution = await db.updateListingById(new_Data, id);
+        if (solution.matchedCount > 0) {
+            res.status(200).json({ message: 'Listing updated' });
+        } else {
+            res.status(404).json({ error: 'Listing not found' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'failed to update'});
     }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update listing' });
-  }
 });
 
+// delete
 app.delete('/api/listings/:id', async (req, res) => {
-  try {
-    const deletedListing = await db.deleteListingById(req.params.id);
-    if (!deletedListing.deletedCount) {
-      res.status(404).json({ error: 'Listing not found' });
-    } else {
-      res.status(204).send();
+    const { _id } = req.params; // for taking id
+    try {
+        const solution = await db.deleteListingById(_id);
+        if (solution.deletedCount > 0) {
+            res.status(204).send(); // send nothing 
+        } else {
+            res.status(404).json({ error: 'nothing found' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failing in delete listing' });
     }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete listing' });
-  }
 });
+
+// Start server and connect to database
+db.initialize(process.env.MONGODB_CONN_STRING).then(() => {
+    app.listen(port, () => {
+        console.log(`Server is running on ${port}`);
+    });
+}).catch((err) => {
+    console.error("Connection failed", err);
+});
+
